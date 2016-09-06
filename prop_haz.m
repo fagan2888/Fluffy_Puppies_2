@@ -109,7 +109,6 @@ disp(strcat(['param_se    ', num2str(param_se',  '% 7.5f ')]));
 disp(strcat(['t_stats     ', num2str(t_stats',   '% 7.4f ')]));
 disp(strcat(['gradient    ', num2str(grad',      '% 7.5f ')]));
 disp(' ');
-
 toc
 
 end
