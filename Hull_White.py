@@ -47,6 +47,10 @@ class Hull_White:
     def Z(self,t,T,r,kappa,sigma, coeff):
         return np.exp(self.A(t,T,kappa,sigma, coeff) - self.B(t,T,kappa,sigma)*r)
     
+    def r_t(self, t, T, r, kappa, sigma, coeff):
+        return -self.A(t,T,kappa,sigma, coeff)/(T-t) + \
+        (1.0/kappa)*((1-np.exp(-kappa*(T-t)))/(T-t))*r
+    
     def put(self,t,T,s,K,r,kappa,sigma, coeff):
         sigma_z = np.sqrt(sigma**2/(2*kappa**3) * (1-np.exp(-2*kappa*(T-t))) * (1-np.exp(-kappa*(s-T)))**2)
         d1 = np.log(self.Z(t,s,r,kappa,sigma, coeff)/(K * self.Z(t,T,r,kappa,sigma, coeff)))/sigma_z + sigma_z/2
