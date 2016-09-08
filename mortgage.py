@@ -8,6 +8,7 @@ Created on Sat Aug 27 11:42:57 2016
 from __future__ import division
 import pandas as pd
 import numpy as np
+import time
 
 
 principal_1 = 77657656.75
@@ -34,8 +35,17 @@ CA = 32550000
 CY = 13950000
 tranche_coupon = 5/(12*100)
 
+def timing(f):
+    def wrap(*args):
+        time1 = time.time()
+        ret = f(*args)
+        time2 = time.time()
+        print('%s function took %0.3f ms' % (f.__name__, (time2-time1)*1000.0))
+        return ret
+    return wrap
 
 # Calculate the CF table
+#@timing
 def pool_CF(principal, monthly_interest, payment_number, PSA, maturity, age, SMM = None):
     # Generate a blank dataframe for putting the data
     pool = {'PMT' : pd.Series(np.zeros(maturity * 12), index=range(1,maturity*12+1)), 
@@ -94,6 +104,7 @@ def pool_CF(principal, monthly_interest, payment_number, PSA, maturity, age, SMM
 
 
 # Summary CF
+#@timing
 def summary_CF(pool_CF_1, pool_CF_2):
     # Generate a blank dataframe
 
@@ -115,38 +126,21 @@ def summary_CF(pool_CF_1, pool_CF_2):
     return summary_df
 
 # Principal CF Alloc
+#@timing
 def Principal_CF_Alloc(summary_CF_df,tranche_coupon,CG,VE,CM,GZ,TC,CZ,CA,CY):
     proportion_1 = (CG+VE+CM+GZ+TC+CZ)/(CG+VE+CM+GZ+TC+CZ+CA+CY)
     proportion_2 = (CA+CY)/(CG+VE+CM+GZ+TC+CZ+CA+CY)
     # Generate blank data frame
-    principal_CF_Alloc = {'Principal_1' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CG_Principal' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CG_EOM' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'VE_Principal' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'VE_EOM' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CM_Principal' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CM_EOM' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'GZ_Interest' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'GZ_Accrued' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'GZ_Principal' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'GZ_EOM' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'TC_Principal' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'TC_EOM' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CZ_Interest' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CZ_Accrued' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CZ_Principal' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CZ_EOM' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'Principal_2' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CA_Principal' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CA_EOM' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CY_Principal' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
-                          'CY_EOM' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1))}
-    principal_CF_Alloc_df = pd.DataFrame(principal_CF_Alloc)
+    col_headers = ['Principal_1', 'CG_Principal', 'CG_EOM', 'VE_Principal', 'VE_EOM', 'CM_Principal', 'CM_EOM',
+                   'GZ_Interest', 'GZ_Accrued', 'GZ_Principal', 'GZ_EOM', 'TC_Principal', 'TC_EOM', 'CZ_Interest',
+                   'CZ_Accrued', 'CZ_Principal', 'CZ_EOM', 'Principal_2', 'CA_Principal', 'CA_EOM', 'CY_Principal','CY_EOM']
+
+    principal_CF_Alloc_df = pd.DataFrame(np.zeros((maturity_1 * 12, len(col_headers))), columns=col_headers, index=range(1,maturity_1*12+1))
+    principal_CF_Alloc_df['Principal_1'] = summary_CF_df['Total_Principal'] * proportion_1
     for i in range(1, maturity_1 * 12 + 1):
-        principal_CF_Alloc_df.loc[i,'Principal_1'] = summary_CF_df.loc[i,'Total_Principal'] * proportion_1
         if i == 1:
             principal_CF_Alloc_df.loc[i,'CZ_Interest'] = CZ * tranche_coupon
-            principal_CF_Alloc_df.loc[i,'CG_Principal'] = min(principal_CF_Alloc_df.loc[i,'Principal_1']+principal_CF_Alloc_df.loc[i,'CZ_Interest'],CG)
+            principal_CF_Alloc_df.loc[i,'CG_Principal'] = min(principal_CF_Alloc_df.loc[i,'Principal_1'] + principal_CF_Alloc_df.loc[i,'CZ_Interest'],CG)
             principal_CF_Alloc_df.loc[i,'CG_EOM'] = CG - principal_CF_Alloc_df.loc[i,'CG_Principal']
             principal_CF_Alloc_df.loc[i,'GZ_Interest'] = GZ * tranche_coupon
             principal_CF_Alloc_df.loc[i,'VE_Principal'] = max(0,min(principal_CF_Alloc_df.loc[i,'Principal_1']+principal_CF_Alloc_df.loc[i,'GZ_Interest']+principal_CF_Alloc_df.loc[i,'CZ_Interest'] - principal_CF_Alloc_df.loc[i,'CG_Principal'],VE))
@@ -162,7 +156,7 @@ def Principal_CF_Alloc(summary_CF_df,tranche_coupon,CG,VE,CM,GZ,TC,CZ,CA,CY):
             if principal_CF_Alloc_df.loc[i,'GZ_EOM'] >0:
                 principal_CF_Alloc_df.loc[i,'TC_Principal'] = 0
             else:
-                principal_CF_Alloc_df.loc[i,'TC_Principal'] = min(principal_CF_Alloc_df.loc[i,'Principal_1']+principal_CF_Alloc_df.loc[i,'CZ_Interest']-principal_CF_Alloc_df.loc[i,'GZ_Principal'] ,TC)
+                principal_CF_Alloc_df.loc[i,'TC_Principal'] = min(principal_CF_Alloc_df.loc[i,'Principal_1'] + principal_CF_Alloc_df.loc[i,'CZ_Interest'] - principal_CF_Alloc_df.loc[i,'GZ_Principal'] ,TC)
             principal_CF_Alloc_df.loc[i,'TC_EOM'] = max(0, TC-principal_CF_Alloc_df.loc[i,'TC_Principal'])
             if principal_CF_Alloc_df.loc[i,'TC_EOM'] >0:
                 principal_CF_Alloc_df.loc[i,'CZ_Accrued'] = principal_CF_Alloc_df.loc[i,'CZ_Interest']
@@ -174,33 +168,7 @@ def Principal_CF_Alloc(summary_CF_df,tranche_coupon,CG,VE,CM,GZ,TC,CZ,CA,CY):
             principal_CF_Alloc_df.loc[i,'CA_Principal'] = min(principal_CF_Alloc_df.loc[i,'Principal_2'],CA)
             principal_CF_Alloc_df.loc[i,'CA_EOM'] = CA - principal_CF_Alloc_df.loc[i,'CA_Principal']
             principal_CF_Alloc_df.loc[i,'CY_Principal'] = min(principal_CF_Alloc_df.loc[i,'Principal_2'] - principal_CF_Alloc_df.loc[i,'CA_Principal'],CY)
-            principal_CF_Alloc_df.loc[i,'CY_EOM'] = CY - principal_CF_Alloc_df.loc[i,'CY_Principal']
-            # Output            
-            #print "%d\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t" % (i, principal_CF_Alloc_df.loc[i,'Principal_1'],
-            #    principal_CF_Alloc_df.loc[i,'CG_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CG_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'VE_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'VE_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'CM_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CM_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'GZ_Interest'],
-            #    principal_CF_Alloc_df.loc[i,'GZ_Accrued'],
-            #    principal_CF_Alloc_df.loc[i,'GZ_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'GZ_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'TC_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'TC_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'CZ_Interest'],
-            #    principal_CF_Alloc_df.loc[i,'CZ_Accrued'],
-            #    principal_CF_Alloc_df.loc[i,'CZ_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CZ_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'Principal_2'],
-            #    principal_CF_Alloc_df.loc[i,'CA_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CA_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'CY_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CY_EOM'])
-
-            
-            
+            principal_CF_Alloc_df.loc[i,'CY_EOM'] = CY - principal_CF_Alloc_df.loc[i,'CY_Principal']           
             
         else:
             principal_CF_Alloc_df.loc[i,'CZ_Interest'] = principal_CF_Alloc_df.loc[i-1,'CZ_EOM'] * tranche_coupon
@@ -233,35 +201,13 @@ def Principal_CF_Alloc(summary_CF_df,tranche_coupon,CG,VE,CM,GZ,TC,CZ,CA,CY):
             principal_CF_Alloc_df.loc[i,'CA_EOM'] = principal_CF_Alloc_df.loc[i-1,'CA_EOM'] - principal_CF_Alloc_df.loc[i,'CA_Principal']
             principal_CF_Alloc_df.loc[i,'CY_Principal'] = min(principal_CF_Alloc_df.loc[i,'Principal_2'] - principal_CF_Alloc_df.loc[i,'CA_Principal'],principal_CF_Alloc_df.loc[i-1,'CY_EOM'])
             principal_CF_Alloc_df.loc[i,'CY_EOM'] = principal_CF_Alloc_df.loc[i-1,'CY_EOM'] - principal_CF_Alloc_df.loc[i,'CY_Principal']
-            # Output
-            #print "%d\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t" % (i, principal_CF_Alloc_df.loc[i,'Principal_1'],
-            #    principal_CF_Alloc_df.loc[i,'CG_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CG_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'VE_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'VE_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'CM_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CM_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'GZ_Interest'],
-            #    principal_CF_Alloc_df.loc[i,'GZ_Accrued'],
-            #    principal_CF_Alloc_df.loc[i,'GZ_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'GZ_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'TC_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'TC_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'CZ_Interest'],
-            #    principal_CF_Alloc_df.loc[i,'CZ_Accrued'],
-            #    principal_CF_Alloc_df.loc[i,'CZ_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CZ_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'Principal_2'],
-            #    principal_CF_Alloc_df.loc[i,'CA_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CA_EOM'],
-            #    principal_CF_Alloc_df.loc[i,'CY_Principal'],
-            #    principal_CF_Alloc_df.loc[i,'CY_EOM'])
+            
     return principal_CF_Alloc_df
             
 
 
     
-
+#@timing
 def Principal(principal_CF_Alloc):
     Principal = {'CG' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
                           'VE' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
@@ -286,7 +232,8 @@ def Principal(principal_CF_Alloc):
         Principal_df.loc[i,'Total_Principal_less_Accrued_Interest'] = Principal_df.loc[i,'CG']+Principal_df.loc[i,'VE']+Principal_df.loc[i,'CM']+Principal_df.loc[i,'GZ']+Principal_df.loc[i,'TC']+Principal_df.loc[i,'CZ']+Principal_df.loc[i,'CA']+Principal_df.loc[i,'CY']-principal_CF_Alloc.loc[i,'GZ_Accrued']-principal_CF_Alloc.loc[i,'CZ_Accrued']
         #print "%d\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t" % (i,Principal_df.loc[i,'CG'],Principal_df.loc[i,'VE'],Principal_df.loc[i,'CM'],Principal_df.loc[i,'GZ'],Principal_df.loc[i,'TC'],Principal_df.loc[i,'CZ'],Principal_df.loc[i,'CA'],Principal_df.loc[i,'CY'],Principal_df.loc[i,'Total_Principal_less_Accrued_Interest'])
     return Principal_df
-    
+   
+#@timing
 def Balance(summary_CF,principal_CF_Alloc):
     Balance = {'CG' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
                           'VE' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
@@ -320,7 +267,8 @@ def Balance(summary_CF,principal_CF_Alloc):
         Balance_df.loc[i+1,'Total'] = Balance_df.loc[i+1,'CG']+Balance_df.loc[i+1,'VE']+Balance_df.loc[i+1,'CM']+Balance_df.loc[i+1,'GZ']+Balance_df.loc[i+1,'TC']+Balance_df.loc[i+1,'CZ']+Balance_df.loc[i+1,'CA']+Balance_df.loc[i+1,'CY']
         #print "%d\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t" % (i,Balance_df.loc[i,'CG'],Balance_df.loc[i,'VE'],Balance_df.loc[i,'CM'],Balance_df.loc[i,'GZ'],Balance_df.loc[i,'TC'],Balance_df.loc[i,'CZ'],Balance_df.loc[i,'CA'],Balance_df.loc[i,'CY'],Balance_df.loc[i,'Total'])
     return Balance_df
-   
+
+#@timing
 def Interest(balance,principal_CF_Alloc,summary_CF,tranche_coupon):
     Interest = {'CG' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
                           'VE' : pd.Series(np.zeros(maturity_1 * 12), index=range(1,maturity_1*12+1)),
@@ -347,6 +295,7 @@ def Interest(balance,principal_CF_Alloc,summary_CF,tranche_coupon):
         #print "%d\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\t" % (i,Interest_df.loc[i,'CG'],Interest_df.loc[i,'VE'],Interest_df.loc[i,'CM'],Interest_df.loc[i,'GZ'],Interest_df.loc[i,'TC'],Interest_df.loc[i,'CZ'],Interest_df.loc[i,'CA'],Interest_df.loc[i,'CY'],Interest_df.loc[i,'Total'])
     return Interest_df    
 
+#@timing
 def Pricing(principal,interest):
     # need to adjust index temporately for adjusting the HW1.py calculation
 
