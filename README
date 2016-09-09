@@ -1,0 +1,9 @@
+Please read the 230M_HW2_Report.html file for the report. 
+
+The HW2 modules are 
+	- MFE230M_HW2_main.py
+	= mortgage_np.py
+	- Discount_Functions.py
+	- Hull_White.py
+
+The notebook 230M_HW2_Report.ipynb should be run with Jupyter Notebook. You can change the parameters such as number of simulations and other settings. The Call_Matlab_from_python.ipynb notebook call functions in MATLAB to get the parameters for hazard rate models.
