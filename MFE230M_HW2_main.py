@@ -255,29 +255,29 @@ def get_OAS(pricing_arr, pricing_arr_anti, r_matrix, r_matrix_anti):
     cols = cols[:len(cols)-1]
     #first 100 paths should be good enought to get a rough estimate
     oas_matrix = []
-    for i in range(len(pricing_arr)):
+    for j in range(len(pricing_arr)):
         print('.',end='')
-        pricing = pricing_arr[i]
+        pricing = pricing_arr[j]
         data_cashflow = pricing[cols]
         oas_arr = []
         for i in range(8):
             oas_res = sp.optimize.minimize(lambda oas: oas_obj_func(oas, data_cashflow.iloc[:,i],i,r_matrix),0.01)
             oas_arr.append(oas_res.x[0])
         oas_matrix.append(oas_arr)
-        if i>=100:
+        if j>=100:
             break
     print('')
     oas_matrix_anti = []     
-    for i in range(len(pricing_arr_anti)):
+    for j in range(len(pricing_arr_anti)):
         print('.',end='')
-        pricing_anti = pricing_arr_anti[i]
+        pricing_anti = pricing_arr_anti[j]
         data_cashflow = pricing_anti[cols]
         oas_arr = []
         for i in range(8):
             oas_res = sp.optimize.minimize(lambda oas: oas_obj_func(oas, data_cashflow.iloc[:,i],i,r_matrix_anti),0.01)
             oas_arr.append(oas_res.x[0])
         oas_matrix_anti.append(oas_arr)
-        if i>=100:
+        if j>=100:
             break
     print('')
     final_oas_arr = np.asarray((0.5 * (np.matrix(oas_matrix) + np.matrix(oas_matrix_anti))).mean(0))[0]
