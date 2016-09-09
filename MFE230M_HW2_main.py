@@ -12,6 +12,7 @@ import scipy as sp
 import Hull_White as hw
 import mortgage_np as m
 import Discount_Functions as disc_func
+import math
 
 ### Variables Setup
 
@@ -213,7 +214,7 @@ def get_V(r0):
 
     final_bond_prices_matrix = 0.5 * (bond_prices_matrix_anti + bond_prices_matrix)
     bond_prices = np.asarray(final_bond_prices_matrix.mean(0))[0]
-    standard_errors = np.asarray(final_bond_prices_matrix.std(0))[0]
+    standard_errors = np.asarray(final_bond_prices_matrix.std(0))[0] / math.sqrt(num_sims)
 
     return (bond_prices, standard_errors, summary_CF, summary_CF_anti, 
             r_matrix, r_anti_matrix, cum_df_matrix, cum_df_anti_matrix,
