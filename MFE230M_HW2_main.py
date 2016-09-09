@@ -64,7 +64,7 @@ beta = np.array([beta_1, beta_2])
 
 # 10 simulation, so that the total number of paths is 100
 # FOR HIGHER PRECISION, CHANGE TO A LARGE NUMBER
-num_sims = 10
+num_sims = 1000
 T = 20
 dt = 1.0/12.0
 dr = 10e-5  # dr taken to be arbitrarily small
@@ -115,23 +115,17 @@ def summer_index_func(t):
 def hazard_func_arr(gamma, p, beta, pool, libor_arr):
     #here the time input t should be integer month
     t_range = np.arange(1,241)
+    libor_arr = np.asarray(libor_arr[0]).flatten()
     summer_index_arr = [summer_index_func(t) for t in t_range]
     v = np.array([WACs[pool] - libor_arr, summer_index_arr])
     v = np.transpose(v)
     exp_val = np.dot(v, beta)
-    return ((gamma*p * (gamma * t_range)**(p-1)) / (1 + (gamma * t_range)**p)) * np.exp(exp_val) 
-
-def hazard_func_arr_1(gamma, p, beta, pool, libor_arr):
-    #here the time input t should be integer month
-    t_range = np.arange(1,241)
-    summer_index_arr = [summer_index_func(t) for t in t_range]
-    v_1 = np.array(WACs[pool] - np.array(libor_arr))[0]
-    v_2 = summer_index_arr
-    v = np.array([v_1, v_2])
-    v = np.transpose(v)
-    exp_val = np.dot(v, beta)
-    return ((gamma*p * (gamma * t_range)**(p-1)) / (1 + (gamma * t_range)**p)) * np.exp(exp_val) 
-
+    up = (gamma * p * (gamma * t_range)**(p-1))
+    down = (1 + (gamma * t_range)**p)
+    mid = np.exp(exp_val) 
+    #return ((gamma*p * (gamma * t_range)**(p-1)) / (1 + (gamma * t_range)**p)) * np.exp(exp_val) 
+    return np.multiply(np.divide(up,down),mid)
+    
 def SMM_func_arr(gamma, p, beta, pool, libor_arr):
     return (1-np.exp(-hazard_func_arr(gamma, p, beta, pool, libor_arr) * 1))
 
@@ -139,8 +133,6 @@ def get_libor_rate_matrix(r_matrix, num_sims):
     libor_rate_matrix = []
     for i in range(num_sims):
         libor_rate_matrix.append(libor_rate_10yr_lag3_from_MC(r_matrix[i,:]))
-        #libor_rate_matrix_anti.append(libor_rate_10yr_lag3_from_MC(r_anti_matrix[i,:]))
-    #libor_rate_matrix = 0.5 * (np.matrix(libor_rate_matrix) + np.matrix(libor_rate_matrix_anti))
     libor_rate_matrix = np.matrix(libor_rate_matrix)
     return libor_rate_matrix
 
@@ -149,7 +141,7 @@ def get_SMM_matrices(gamma, p, beta, libor_rate_matrix, num_sims):
     SMM_matrix_2 = []
 
     for i in range(num_sims):
-        libor_arr = np.asarray(libor_rate_matrix[i,:])[0]
+        libor_arr = libor_rate_matrix[i,:]
         SMM_matrix_1.append(pd.Series(SMM_func_arr(gamma, p, beta, 0, libor_arr)))
         SMM_matrix_2.append(pd.Series(SMM_func_arr(gamma, p, beta, 1, libor_arr)))
 
@@ -158,7 +150,7 @@ def get_SMM_matrices(gamma, p, beta, libor_rate_matrix, num_sims):
 def get_bond_prices_matrix(num_sims, SMM_matrix_1, SMM_matrix_2, cum_df_matrix):
     pricing_arr = []
     for i in range(num_sims):
-        if i%10==0:
+        if i % int(num_sims//100)==0:
             print('.',end='')
         SMM_arr_1 = SMM_matrix_1[i]
         SMM_arr_2 = SMM_matrix_2[i]
@@ -190,6 +182,7 @@ def get_bond_prices_matrix(num_sims, SMM_matrix_1, SMM_matrix_2, cum_df_matrix):
 
         bond_prices_matrix.append(bond_prices)
     bond_prices_matrix = np.matrix(bond_prices_matrix)
+    print('')
     return (bond_prices_matrix, summary_CF, pricing_arr)
 
 def get_V(r0):
@@ -211,7 +204,6 @@ def get_V(r0):
     r_matrix = r_matrix[:,:240]
     r_anti_matrix = r_anti_matrix[:,:240]
 
-    
     (SMM_matrix_1, SMM_matrix_2) = get_SMM_matrices(gamma, p, beta, libor_rate_matrix, num_sims)
     (SMM_matrix_1_anti, SMM_matrix_2_anti) = get_SMM_matrices(gamma, p, beta, libor_rate_matrix_anti, num_sims)
 
@@ -248,7 +240,7 @@ def get_residual_V(r0,summary_CF, summary_CF_anti, r_matrix, r_anti_matrix, cum_
     return 0.5 * (np.array(residual_arr) + np.array(residual_arr_anti))
 
 def oas_obj_func(oas,bond,i,r_matrix):
-    dt = 1/12
+    dt = 1.0/12.0
     iterations = 240
     r_matrix_new = r_matrix + oas
     df_matrix_new = np.exp(-r_matrix_new*dt)
@@ -260,38 +252,43 @@ def oas_obj_func(oas,bond,i,r_matrix):
 def get_OAS(pricing_arr, pricing_arr_anti, r_matrix, r_matrix_anti):
     cols = (pricing_arr[0]).columns
     cols = cols[:len(cols)-1]
-
+    #first 10% or 100 should be good enought to get a rough estimate
     oas_matrix = []
-    for pricing in pricing_arr:
+    for i in range(max(100,len(pricing_arr)//10)):
+        print('.',end='')
+        pricing = pricing_arr[i]
         data_cashflow = pricing[cols]
         oas_arr = []
         for i in range(8):
             oas_res = sp.optimize.minimize(lambda oas: oas_obj_func(oas, data_cashflow.iloc[:,i],i,r_matrix),0.01)
             oas_arr.append(oas_res.x[0])
         oas_matrix.append(oas_arr)
-
+    print('')
     oas_matrix_anti = []     
-    for pricing_anti in pricing_arr_anti:
+    for i in range(max(100,len(pricing_arr_anti)//10)):
+        print('.',end='')
+        pricing_anti = pricing_arr_anti[i]
         data_cashflow = pricing_anti[cols]
         oas_arr = []
         for i in range(8):
             oas_res = sp.optimize.minimize(lambda oas: oas_obj_func(oas, data_cashflow.iloc[:,i],i,r_matrix_anti),0.01)
             oas_arr.append(oas_res.x[0])
         oas_matrix_anti.append(oas_arr)
-
+    print('')
     final_oas_arr = np.asarray((0.5 * (np.matrix(oas_matrix) + np.matrix(oas_matrix_anti))).mean(0))[0]
     return final_oas_arr
 
 def avg_hazard_rate(pool, r_matrix, r_anti_matrix, num_sims):
     hazard_rate_matrix = []
     libor_rate_matrix = get_libor_rate_matrix(r_matrix, num_sims)
-    for libor_arr in libor_rate_matrix:
-        hazard_rate_matrix.append(hazard_func_arr_1(gamma, p, beta, pool, libor_arr))
+    for i in range(np.shape(libor_rate_matrix)[0]):
+        hazard_rate_matrix.append(hazard_func_arr(gamma, p, beta, pool, libor_rate_matrix[i,:]))
     hazard_rate_matrix_anti = []
     libor_rate_matrix_anti = get_libor_rate_matrix(r_anti_matrix, num_sims)
-    for libor_arr in libor_rate_matrix_anti:
-        hazard_rate_matrix_anti.append(hazard_func_arr_1(gamma, p, beta, pool, libor_arr))
+    for i in range(np.shape(libor_rate_matrix_anti)[0]):
+        hazard_rate_matrix_anti.append(hazard_func_arr(gamma, p, beta, pool, libor_rate_matrix_anti[i,:]))
 
-    final_hazard_rate_matrix = np.matrix(hazard_rate_matrix) + np.matrix(hazard_rate_matrix_anti)
+    final_hazard_rate_matrix = (np.matrix(hazard_rate_matrix) + np.matrix(hazard_rate_matrix_anti))*0.5
+    #final_hazard_rate_matrix = np.matrix(hazard_rate_matrix)
     return np.asarray(final_hazard_rate_matrix.mean(0))
-   
+
