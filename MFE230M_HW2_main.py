@@ -150,7 +150,7 @@ def get_SMM_matrices(gamma, p, beta, libor_rate_matrix, num_sims):
 def get_bond_prices_matrix(num_sims, SMM_matrix_1, SMM_matrix_2, cum_df_matrix):
     pricing_arr = []
     for i in range(num_sims):
-        if i % int(num_sims//100)==0:
+        if i % int(num_sims//100 + 1) ==0:
             print('.',end='')
         SMM_arr_1 = SMM_matrix_1[i]
         SMM_arr_2 = SMM_matrix_2[i]
@@ -168,12 +168,12 @@ def get_bond_prices_matrix(num_sims, SMM_matrix_1, SMM_matrix_2, cum_df_matrix):
     for i in range(num_sims):
         pricing = pricing_arr[i]
         # Adjsut the order of column 
-        cols = pricing.columns.tolist()
-        cols = [cols[6], cols[1], cols[8], cols[2], cols[5], cols[7], cols[4], cols[0], cols[3]]
+        cols = (pricing_arr[0]).columns
+        cols = cols[:len(cols)-1]
         data_cashflow = pricing[cols]
 
         # Price bonds
-        bonds = data_cashflow.iloc[:,1:]
+        bonds = data_cashflow
         #bond_prices = 0.5 * ((cum_df_matrix[i] * np.matrix(bonds)) + (cum_df_anti_matrix[i] * np.matrix(bonds)))
         bond_prices = cum_df_matrix[i] * np.matrix(bonds)
         bond_prices = np.asarray(bond_prices)[0]
@@ -252,9 +252,9 @@ def oas_obj_func(oas,bond,i,r_matrix):
 def get_OAS(pricing_arr, pricing_arr_anti, r_matrix, r_matrix_anti):
     cols = (pricing_arr[0]).columns
     cols = cols[:len(cols)-1]
-    #first 10% or 100 should be good enought to get a rough estimate
+    #first 100 paths should be good enought to get a rough estimate
     oas_matrix = []
-    for i in range(max(100,len(pricing_arr)//10)):
+    for i in range(len(pricing_arr)):
         print('.',end='')
         pricing = pricing_arr[i]
         data_cashflow = pricing[cols]
@@ -263,9 +263,11 @@ def get_OAS(pricing_arr, pricing_arr_anti, r_matrix, r_matrix_anti):
             oas_res = sp.optimize.minimize(lambda oas: oas_obj_func(oas, data_cashflow.iloc[:,i],i,r_matrix),0.01)
             oas_arr.append(oas_res.x[0])
         oas_matrix.append(oas_arr)
+        if i>=100:
+            break
     print('')
     oas_matrix_anti = []     
-    for i in range(max(100,len(pricing_arr_anti)//10)):
+    for i in range(len(pricing_arr_anti)):
         print('.',end='')
         pricing_anti = pricing_arr_anti[i]
         data_cashflow = pricing_anti[cols]
@@ -274,6 +276,8 @@ def get_OAS(pricing_arr, pricing_arr_anti, r_matrix, r_matrix_anti):
             oas_res = sp.optimize.minimize(lambda oas: oas_obj_func(oas, data_cashflow.iloc[:,i],i,r_matrix_anti),0.01)
             oas_arr.append(oas_res.x[0])
         oas_matrix_anti.append(oas_arr)
+        if i>=100:
+            break
     print('')
     final_oas_arr = np.asarray((0.5 * (np.matrix(oas_matrix) + np.matrix(oas_matrix_anti))).mean(0))[0]
     return final_oas_arr
